@@ -427,6 +427,96 @@ Seed complete.
 
 **Phase 3 Status: COMPLETE ✅**
 
+---
+
+## Phase 4 — Forecast Service (Demand Estimation & Wilson EOQ Optimization)
+
+### P4-01 — Mathematical verification of Wilson Formula & Packaging constraints
+
+| Field | Value |
+|-------|-------|
+| **Date/Time** | 2026-10-04T15:50:12+11:00 |
+| **Feature tested** | EOQ algorithm ($Q = \sqrt{\frac{2DS}{H}}$) |
+| **Command/action** | Unit calculation: $D=1000, S=50, H=5, \text{packSize}=10$ |
+| **Actual result** | Raw theoretical EOQ: 141.42 units; case-pack rounded: 150 units; Total annual inventory cost: $708.33. |
+| **Pass/Fail** | ✅ PASS |
+| **Evidence filename** | `services/forecast-service/forecast_engine.js` |
+| **SIT314 requirement** | Demand forecasting & Economic Order Quantity optimization |
+
+---
+
+### P4-02 — Forecast Service startup & Atlas DB ping
+
+| Field | Value |
+|-------|-------|
+| **Date/Time** | 2026-10-04T15:50:14+11:00 |
+| **Feature tested** | Express service startup on port 3002 & health check |
+| **Command/action** | `node services/forecast-service/server.js`, `GET /health` |
+| **Actual result** | `Forecast Service listening on http://localhost:3002`, `GET /health` returns HTTP 200 with `status: "healthy"`. |
+| **Pass/Fail** | ✅ PASS |
+| **Evidence filename** | `services/forecast-service/server.js` |
+| **SIT314 requirement** | Independent microservice architecture & health monitoring |
+
+---
+
+### P4-03 — Demand estimation & days-of-supply analysis
+
+| Field | Value |
+|-------|-------|
+| **Date/Time** | 2026-10-04T15:50:15+11:00 |
+| **Feature tested** | Historical telemetry depletion rate calculation |
+| **Command/action** | `GET /forecast/STORE-01/SKU-1001` |
+| **Actual result** | Analyzed historical `shelf_readings`: Daily demand: 0.79 units/day, current stock: 14, days of supply remaining: 17.7 days. |
+| **Pass/Fail** | ✅ PASS |
+| **Evidence filename** | `scripts/test_phase4.js` |
+| **SIT314 requirement** | Telemetry-driven demand analysis |
+
+---
+
+### P4-04 — EOQ Wilson optimization endpoint with packaging alignment
+
+| Field | Value |
+|-------|-------|
+| **Date/Time** | 2026-10-04T15:50:15+11:00 |
+| **Feature tested** | `GET /eoq/STORE-01/SKU-1002` |
+| **Command/action** | Wilson formula evaluation using product parameters |
+| **Actual result** | Evaluated `SKU-1002` (White Bread Loaf): Raw EOQ: 78.36 units, Case pack size: 12, Recommended optimal order quantity $Q^*$: 84 units, Orders per year: 3.65, Total inventory cost: $392.74. |
+| **Pass/Fail** | ✅ PASS |
+| **Evidence filename** | `scripts/test_phase4.js` |
+| **SIT314 requirement** | Algorithmic reorder quantity calculation |
+
+---
+
+### P4-05 — Store-wide batch replenishment recommendations
+
+| Field | Value |
+|-------|-------|
+| **Date/Time** | 2026-10-04T15:50:15+11:00 |
+| **Feature tested** | `GET /forecast/STORE-01` |
+| **Command/action** | Multi-product inventory scan across `products` and `inventory_status` |
+| **Actual result** | 5 products evaluated: correctly flagged `SKU-1002` stock (6 <= threshold 15) with `replenishment_recommended: true` and calculated recommended replenishment order quantity of 84 units. |
+| **Pass/Fail** | ✅ PASS |
+| **Evidence filename** | `scripts/test_phase4.js` |
+| **SIT314 requirement** | Proactive stock management & automated decision support |
+
+---
+
+## Phase 4 Summary
+
+| Check | Status |
+|-------|--------|
+| Mathematical correctness of Wilson Formula verified | ✅ |
+| Forecast Service operational on port 3002 | ✅ |
+| Health check passes with MongoDB Atlas ping | ✅ |
+| Single-product demand forecast and days-of-supply analysis operational | ✅ |
+| EOQ optimization endpoint with packaging alignment operational | ✅ |
+| Store-wide batch replenishment recommendation operational | ✅ |
+| 404 error handling for non-existent products verified | ✅ |
+| Phase 4 automated test suite (`scripts/test_phase4.js`) passed | ✅ |
+
+**Phase 4 Status: COMPLETE ✅**
+
+
 
 
 
