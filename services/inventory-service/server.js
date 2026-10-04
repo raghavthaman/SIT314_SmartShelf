@@ -14,6 +14,7 @@ require("dotenv").config({ path: path.resolve(__dirname, "../../.env") });
 const express = require("express");
 const { connectDB, checkDBHealth } = require("../shared/db");
 const logger = require("../shared/logger");
+const cache = require("../shared/cache");
 
 process.env.SERVICE_NAME = "inventory-service";
 
@@ -78,10 +79,17 @@ app.post("/products", async (req, res) => {
   }
 });
 
-// READ (all)
+// READ (all) with Cache-Aside
 app.get("/products", async (req, res) => {
   try {
+    const cached = await cache.get("products:all");
+    if (cached) {
+      res.set("X-Cache", "HIT");
+      return res.json(cached);
+    }
     const items = await db.collection("products").find({}).toArray();
+    await cache.set("products:all", items, 60);
+    res.set("X-Cache", "MISS");
     res.json(items);
   } catch (err) {
     logger.error("GET /products failed", { error: err.message });
@@ -89,11 +97,19 @@ app.get("/products", async (req, res) => {
   }
 });
 
-// READ (one, by product_id)
+// READ (one, by product_id) with Cache-Aside
 app.get("/products/:product_id", async (req, res) => {
   try {
+    const cacheKey = `products:${req.params.product_id}`;
+    const cached = await cache.get(cacheKey);
+    if (cached) {
+      res.set("X-Cache", "HIT");
+      return res.json(cached);
+    }
     const item = await db.collection("products").findOne({ product_id: req.params.product_id });
     if (!item) return res.status(404).json({ error: "Product not found" });
+    await cache.set(cacheKey, item, 60);
+    res.set("X-Cache", "MISS");
     res.json(item);
   } catch (err) {
     logger.error("GET /products/:id failed", { error: err.message, product_id: req.params.product_id });
@@ -101,7 +117,7 @@ app.get("/products/:product_id", async (req, res) => {
   }
 });
 
-// UPDATE (by product_id)
+// UPDATE (by product_id) with cache invalidation
 app.put("/products/:product_id", async (req, res) => {
   try {
     const result = await db.collection("products").updateOne(
@@ -109,7 +125,8 @@ app.put("/products/:product_id", async (req, res) => {
       { $set: req.body }
     );
     if (result.matchedCount === 0) return res.status(404).json({ error: "Product not found" });
-    logger.info("Product updated", { product_id: req.params.product_id });
+    await cache.del("products");
+    logger.info("Product updated and cache invalidated", { product_id: req.params.product_id });
     res.json({ modifiedCount: result.modifiedCount });
   } catch (err) {
     logger.error("PUT /products/:id failed", { error: err.message });
@@ -117,12 +134,13 @@ app.put("/products/:product_id", async (req, res) => {
   }
 });
 
-// DELETE (by product_id)
+// DELETE (by product_id) with cache invalidation
 app.delete("/products/:product_id", async (req, res) => {
   try {
     const result = await db.collection("products").deleteOne({ product_id: req.params.product_id });
     if (result.deletedCount === 0) return res.status(404).json({ error: "Product not found" });
-    logger.info("Product deleted", { product_id: req.params.product_id });
+    await cache.del("products");
+    logger.info("Product deleted and cache invalidated", { product_id: req.params.product_id });
     res.json({ deletedCount: result.deletedCount });
   } catch (err) {
     logger.error("DELETE /products/:id failed", { error: err.message });
@@ -134,12 +152,20 @@ app.delete("/products/:product_id", async (req, res) => {
 // INVENTORY STATUS
 // ================================================================
 
-// Current stock for a store
+// Current stock for a store with Cache-Aside
 app.get("/inventory/:store_id", async (req, res) => {
   try {
+    const cacheKey = `inventory:${req.params.store_id}`;
+    const cached = await cache.get(cacheKey);
+    if (cached) {
+      res.set("X-Cache", "HIT");
+      return res.json(cached);
+    }
     const items = await db.collection("inventory_status")
       .find({ store_id: req.params.store_id })
       .toArray();
+    await cache.set(cacheKey, items, 30);
+    res.set("X-Cache", "MISS");
     res.json(items);
   } catch (err) {
     logger.error("GET /inventory/:store_id failed", { error: err.message });
@@ -147,14 +173,22 @@ app.get("/inventory/:store_id", async (req, res) => {
   }
 });
 
-// Stock for a specific product in a specific store
+// Stock for a specific product in a specific store with Cache-Aside
 app.get("/inventory/:store_id/:product_id", async (req, res) => {
   try {
+    const cacheKey = `inventory:${req.params.store_id}:${req.params.product_id}`;
+    const cached = await cache.get(cacheKey);
+    if (cached) {
+      res.set("X-Cache", "HIT");
+      return res.json(cached);
+    }
     const item = await db.collection("inventory_status").findOne({
       store_id: req.params.store_id,
       product_id: req.params.product_id,
     });
     if (!item) return res.status(404).json({ error: "No inventory record found" });
+    await cache.set(cacheKey, item, 30);
+    res.set("X-Cache", "MISS");
     res.json(item);
   } catch (err) {
     logger.error("GET /inventory/:store/:product failed", { error: err.message });
@@ -162,7 +196,7 @@ app.get("/inventory/:store_id/:product_id", async (req, res) => {
   }
 });
 
-// Manually update stock estimate
+// Manually update stock estimate with cache invalidation
 app.put("/inventory/:store_id/:product_id", async (req, res) => {
   try {
     const result = await db.collection("inventory_status").updateOne(
@@ -170,7 +204,8 @@ app.put("/inventory/:store_id/:product_id", async (req, res) => {
       { $set: { ...req.body, last_updated: new Date() } }
     );
     if (result.matchedCount === 0) return res.status(404).json({ error: "No inventory record found" });
-    logger.info("Inventory updated", {
+    await cache.del(`inventory:${req.params.store_id}`);
+    logger.info("Inventory updated and cache invalidated", {
       store_id: req.params.store_id,
       product_id: req.params.product_id,
     });
@@ -179,6 +214,15 @@ app.put("/inventory/:store_id/:product_id", async (req, res) => {
     logger.error("PUT /inventory/:store/:product failed", { error: err.message });
     res.status(500).json({ error: "Internal server error" });
   }
+});
+
+// Cache status endpoint
+app.get("/cache/stats", (req, res) => {
+  res.json({
+    service: "inventory-service",
+    timestamp: new Date().toISOString(),
+    cache: cache.getStats(),
+  });
 });
 
 // Queue depth and metrics endpoint

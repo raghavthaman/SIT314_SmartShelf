@@ -3,7 +3,7 @@
 // Consumes telemetry events buffered by Node-RED / gateway, applies backpressure smoothing,
 // persists records in MongoDB Atlas, and dispatches stock replenishment events.
 
-const { queue, logger } = require("../shared");
+const { queue, logger, cache } = require("../shared");
 
 function startQueueConsumerWorker(db, queueUrl = "smartshelf-readings-queue") {
   logger.info("Initializing Asynchronous Queue Consumer Worker", { queueUrl });
@@ -53,6 +53,8 @@ function startQueueConsumerWorker(db, queueUrl = "smartshelf-readings-queue") {
         },
         { upsert: true }
       );
+
+      await cache.del(`inventory:${store_id}`);
 
       logger.info("Queue Worker processed reading & updated stock", {
         store_id,

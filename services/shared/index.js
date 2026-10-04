@@ -5,6 +5,7 @@ const { connectDB, closeDB, client, checkDBHealth } = require("./db");
 const logger = require("./logger");
 const { loadConfig } = require("./config");
 const queue = require("./queue");
+const cache = require("./cache");
 
 module.exports = {
   connectDB,
@@ -14,4 +15,5 @@ module.exports = {
   logger,
   loadConfig,
   queue,
+  cache,
 };
