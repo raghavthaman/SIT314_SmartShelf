@@ -33,6 +33,8 @@ flows_*_cred.json
 .config.runtime.json
 .queues/
 **/.queues/
+.data/
+**/.data/
 
 # AWS credentials and config
 .aws/
