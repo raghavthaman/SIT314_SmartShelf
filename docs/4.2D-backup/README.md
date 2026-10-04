@@ -13,7 +13,7 @@ Follow the steps below in order — total time roughly 20–30 minutes including
 2. Go to your project → Cluster0 → click **Connect**
 3. Choose **Drivers**, select **Node.js**
 4. Copy the connection string, e.g.
-   `mongodb+srv://thamanraghav4_db_user:<password>@cluster0.xxxxx.mongodb.net/?retryWrites=true&w=majority`
+   `mongodb+srv://<your-db-user>:<password>@cluster0.xxxxx.mongodb.net/?retryWrites=true&w=majority`
 5. Make sure your current IP is allow-listed: Atlas → Network Access → Add IP Address → "Add Current IP Address"
 
 ## 2. Configure the project
