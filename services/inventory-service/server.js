@@ -185,11 +185,15 @@ app.put("/inventory/:store_id/:product_id", async (req, res) => {
 // STARTUP
 // ================================================================
 
+const { startMqttConsumer } = require("./mqtt_consumer");
+
 connectDB()
   .then((database) => {
     db = database;
     app.listen(PORT, () => {
       logger.info(`Inventory Service listening on http://localhost:${PORT}`);
+      // Start MQTT Telemetry Consumer
+      startMqttConsumer(db);
     });
   })
   .catch((err) => {

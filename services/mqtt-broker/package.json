@@ -1,0 +1,12 @@
+{
+  "name": "smartshelf-mqtt-broker",
+  "version": "1.0.0",
+  "description": "SmartShelf Embedded MQTT Broker (Aedes)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "aedes": "^0.51.0"
+  }
+}

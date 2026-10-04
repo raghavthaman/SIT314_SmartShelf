@@ -1,0 +1,14 @@
+{
+  "name": "smartshelf-simulator",
+  "version": "1.0.0",
+  "description": "SmartShelf Sensor Telemetry Simulator (RFID + Weight)",
+  "main": "sensor_publisher.js",
+  "scripts": {
+    "start": "node sensor_publisher.js"
+  },
+  "dependencies": {
+    "@babel/runtime": "^8.0.5",
+    "dotenv": "^16.4.5",
+    "mqtt": "^5.5.0"
+  }
+}

@@ -207,3 +207,76 @@ Seed complete.
 
 ---
 
+## Phase 1 — MQTT Broker, Telemetry Simulator & Ingestion Pipeline
+
+### P1-01 — Embedded MQTT Broker startup
+
+| Field | Value |
+|-------|-------|
+| **Date/Time** | 2026-10-04T15:17:26+11:00 |
+| **Feature tested** | Standalone MQTT Broker service (`services/mqtt-broker`) |
+| **Command/action** | `node services/mqtt-broker/server.js` |
+| **Actual result** | `[MQTT Broker] Listening on mqtt://0.0.0.0:1883` |
+| **Pass/Fail** | ✅ PASS |
+| **Evidence filename** | `services/mqtt-broker/server.js` |
+| **SIT314 requirement** | Event-driven architecture — MQTT Broker initialization |
+
+---
+
+### P1-02 — Telemetry Ingestion Consumer subscription
+
+| Field | Value |
+|-------|-------|
+| **Date/Time** | 2026-10-04T15:17:26+11:00 |
+| **Feature tested** | Inventory Service MQTT Consumer (`mqtt_consumer.js`) |
+| **Command/action** | Integrated into Inventory Service startup sequence |
+| **Actual result** | Subscribed to topic `smartshelf/sensors/#` on `mqtt://localhost:1883` |
+| **Pass/Fail** | ✅ PASS |
+| **Evidence filename** | `services/inventory-service/mqtt_consumer.js` |
+| **SIT314 requirement** | Event-driven microservice telemetry ingestion |
+
+---
+
+### P1-03 — Telemetry Simulation & Noise Filtering
+
+| Field | Value |
+|-------|-------|
+| **Date/Time** | 2026-10-04T15:17:28+11:00 |
+| **Feature tested** | Telemetry publisher & validation logic |
+| **Command/action** | `node simulator/sensor_publisher.js --count 5` |
+| **Actual result** | 15 total telemetry events published (RFID + Weight); 3 noise events (`qty = -1`) dropped by validation rules; 12 valid readings stored in MongoDB Atlas `shelf_readings`. Zero noise records persisted. |
+| **Pass/Fail** | ✅ PASS |
+| **Evidence filename** | `simulator/sensor_publisher.js` |
+| **SIT314 requirement** | Sensor telemetry ingestion, data validation & MongoDB Atlas persistence |
+
+---
+
+### P1-04 — Inventory Status Live Update
+
+| Field | Value |
+|-------|-------|
+| **Date/Time** | 2026-10-04T15:17:28+11:00 |
+| **Feature tested** | Stock level update in `inventory_status` |
+| **Command/action** | Automatic update triggered by MQTT telemetry ingestion |
+| **Actual result** | Stock status updated in real-time (`SKU-1001`: 17, `SKU-1002`: 8, `SKU-1003`: 22) with `last_updated` timestamp and `last_sensor` type |
+| **Pass/Fail** | ✅ PASS |
+| **Evidence filename** | `scripts/test_phase1.js` |
+| **SIT314 requirement** | Live stock estimation from sensor fusion |
+
+---
+
+## Phase 1 Summary
+
+| Check | Status |
+|-------|--------|
+| Standalone Aedes MQTT broker running on port 1883 | ✅ |
+| Eclipse Mosquitto Docker configuration (`infra/docker-compose.yml`, `infra/mosquitto.conf`) provided | ✅ |
+| Sensor simulator (`simulator/sensor_publisher.js`) publishing to `smartshelf/sensors/#` | ✅ |
+| Telemetry consumer (`mqtt_consumer.js`) validating messages and filtering out noise | ✅ |
+| Raw telemetry persisted to MongoDB Atlas `shelf_readings` collection | ✅ |
+| Real-time inventory status updated in MongoDB Atlas `inventory_status` collection | ✅ |
+| Phase 1 end-to-end automated test suite (`scripts/test_phase1.js`) passed | ✅ |
+
+**Phase 1 Status: COMPLETE ✅**
+
+
