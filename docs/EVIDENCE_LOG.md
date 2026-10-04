@@ -353,5 +353,80 @@ Seed complete.
 
 **Phase 2 Status: COMPLETE ✅**
 
+---
+
+## Phase 3 — Asynchronous Message Queuing (SQS Buffering) & Competing Consumer Architecture
+
+### P3-01 — Message Queue buffering & spike smoothing
+
+| Field | Value |
+|-------|-------|
+| **Date/Time** | 2026-10-04T15:40:27+11:00 |
+| **Feature tested** | Queue Producer & Buffer (`services/shared/queue.js`) |
+| **Command/action** | Rapid burst ingestion of 15 telemetry messages |
+| **Actual result** | 15 messages buffered with generated `MessageId` and `MD5OfBody`, queue depth increased to 15 without blocking. |
+| **Pass/Fail** | ✅ PASS |
+| **Evidence filename** | `services/shared/queue.js`, `scripts/test_phase3.js` |
+| **SIT314 requirement** | Asynchronous queuing & spike-smoothing buffer (SQS architecture) |
+
+---
+
+### P3-02 — Asynchronous Competing Consumer Worker & queue drain
+
+| Field | Value |
+|-------|-------|
+| **Date/Time** | 2026-10-04T15:40:30+11:00 |
+| **Feature tested** | Queue Consumer Worker (`services/inventory-service/queue_consumer.js`) |
+| **Command/action** | Background batch consumption, validation, MongoDB persistence, and acknowledgment |
+| **Actual result** | Queue Consumer Worker drained all 15 buffered messages, filtered out noise readings (`qty = -1`), persisted valid records to `shelf_readings`, and acknowledged receipt handles (`deleteMessage`). Readings queue depth reduced to 0. |
+| **Pass/Fail** | ✅ PASS |
+| **Evidence filename** | `services/inventory-service/queue_consumer.js` |
+| **SIT314 requirement** | Competing consumer pattern & reliable message delivery |
+
+---
+
+### P3-03 — Event-Driven Replenishment Alert Queuing
+
+| Field | Value |
+|-------|-------|
+| **Date/Time** | 2026-10-04T15:40:30+11:00 |
+| **Feature tested** | Automatic stock event dispatch to downstream queue |
+| **Command/action** | Reorder threshold evaluation during queue message consumption |
+| **Actual result** | When `SKU-1002` stock dropped to 7 & 6 (below threshold 15), 6 `REPLENISHMENT_REQUIRED` alert messages were automatically dispatched into `smartshelf-stock-events-queue`. |
+| **Pass/Fail** | ✅ PASS |
+| **Evidence filename** | `services/shared/queue.js` (queue: `smartshelf-stock-events-queue`) |
+| **SIT314 requirement** | Event-driven microservice decoupling via message queues |
+
+---
+
+### P3-04 — Queue Metrics & Monitoring REST API
+
+| Field | Value |
+|-------|-------|
+| **Date/Time** | 2026-10-04T15:40:32+11:00 |
+| **Feature tested** | Health & Queue Monitoring endpoint (`GET /queue/status`) |
+| **Command/action** | HTTP GET query to Inventory Service |
+| **Actual result** | HTTP 200 returned with JSON reporting real-time message depths and in-flight counts for `readingsQueue` and `eventsQueue`. |
+| **Pass/Fail** | ✅ PASS |
+| **Evidence filename** | `scripts/test_phase3.js` |
+| **SIT314 requirement** | Observability, queue monitoring & architectural diagnostics |
+
+---
+
+## Phase 3 Summary
+
+| Check | Status |
+|-------|--------|
+| Dual-mode Queue module (`services/shared/queue.js`) supporting AWS SQS & local buffer | ✅ |
+| High-velocity telemetry burst buffering verified (15 messages queued) | ✅ |
+| Asynchronous consumer worker drained queue and updated MongoDB Atlas | ✅ |
+| Sensor noise filtering applied in queue consumer pipeline | ✅ |
+| Low-stock events routed into downstream replenishment queue (`smartshelf-stock-events-queue`) | ✅ |
+| Observability endpoint `GET /queue/status` operational | ✅ |
+| Phase 3 automated test suite (`scripts/test_phase3.js`) passed | ✅ |
+
+**Phase 3 Status: COMPLETE ✅**
+
+
 
 

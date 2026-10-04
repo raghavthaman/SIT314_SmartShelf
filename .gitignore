@@ -31,6 +31,8 @@ flows_*_cred.json
 .config.nodes.json
 .config.users.json
 .config.runtime.json
+.queues/
+**/.queues/
 
 # AWS credentials and config
 .aws/

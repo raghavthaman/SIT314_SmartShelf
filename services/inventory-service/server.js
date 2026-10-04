@@ -181,11 +181,38 @@ app.put("/inventory/:store_id/:product_id", async (req, res) => {
   }
 });
 
+// Queue depth and metrics endpoint
+app.get("/queue/status", async (req, res) => {
+  try {
+    const { queue } = require("../shared");
+    const readingsQueue = process.env.SQS_READINGS_QUEUE_URL || "smartshelf-readings-queue";
+    const eventsQueue = process.env.SQS_STOCK_EVENTS_QUEUE_URL || "smartshelf-stock-events-queue";
+
+    const [readingsStats, eventsStats] = await Promise.all([
+      queue.getQueueStats(readingsQueue),
+      queue.getQueueStats(eventsQueue),
+    ]);
+
+    res.json({
+      service: "inventory-service",
+      timestamp: new Date().toISOString(),
+      queues: {
+        readingsQueue: readingsStats,
+        eventsQueue: eventsStats,
+      },
+    });
+  } catch (err) {
+    logger.error("GET /queue/status failed", { error: err.message });
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // ================================================================
 // STARTUP
 // ================================================================
 
 const { startMqttConsumer } = require("./mqtt_consumer");
+const { startQueueConsumerWorker } = require("./queue_consumer");
 
 connectDB()
   .then((database) => {
@@ -194,6 +221,8 @@ connectDB()
       logger.info(`Inventory Service listening on http://localhost:${PORT}`);
       // Start MQTT Telemetry Consumer
       startMqttConsumer(db);
+      // Start Asynchronous Queue Consumer Worker
+      startQueueConsumerWorker(db);
     });
   })
   .catch((err) => {
