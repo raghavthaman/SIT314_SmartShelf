@@ -279,4 +279,79 @@ Seed complete.
 
 **Phase 1 Status: COMPLETE ✅**
 
+---
+
+## Phase 2 — Node-RED Edge Gateway & Event Stream Processing
+
+### P2-01 — Node-RED runtime initialization & flow deployment
+
+| Field | Value |
+|-------|-------|
+| **Date/Time** | 2026-10-04T15:24:10+11:00 |
+| **Feature tested** | Isolated Node-RED edge gateway runtime |
+| **Command/action** | `node-red -u node-red -s node-red/settings.js node-red/flows.json` |
+| **Actual result** | Server running at `http://127.0.0.1:1880/`, loaded declarative flow `node-red/flows.json`, connected to MQTT broker `127.0.0.1:1883` as `nodered-smartshelf-edge` |
+| **Pass/Fail** | ✅ PASS |
+| **Evidence filename** | `node-red/flows.json`, `node-red/settings.js` |
+| **SIT314 requirement** | Edge gateway / event stream processor integration (Node-RED) |
+
+---
+
+### P2-02 — Telemetry stream validation & edge noise filtering
+
+| Field | Value |
+|-------|-------|
+| **Date/Time** | 2026-10-04T15:24:20+11:00 |
+| **Feature tested** | Function node: `Validate & Filter Telemetry` |
+| **Command/action** | Streamed telemetry rounds via simulator |
+| **Actual result** | 12 total messages received; 11 valid telemetry events validated & enriched with edge metadata (`gateway_id: 'NODE-RED-EDGE-01'`, `edge_processed_at`); 1 out-of-range sensor noise packet (`qty < 0`) routed to dropped noise filter. |
+| **Pass/Fail** | ✅ PASS |
+| **Evidence filename** | `node-red/flows.json` (node: `node_validate_filter`) |
+| **SIT314 requirement** | Stream validation, edge filtering & noise elimination |
+
+---
+
+### P2-03 — Low-stock threshold detection & alert event routing
+
+| Field | Value |
+|-------|-------|
+| **Date/Time** | 2026-10-04T15:24:20+11:00 |
+| **Feature tested** | Switch & Function nodes: `Route: Alert vs Standard` |
+| **Command/action** | Automatic evaluation of stock against SKU reorder thresholds |
+| **Actual result** | 4 low-stock events flagged (`SKU-1002` qty 9/8 <= threshold 10); formatted into `LOW_STOCK_ALERT` event payload targeting downstream EOQ / notification services. |
+| **Pass/Fail** | ✅ PASS |
+| **Evidence filename** | `node-red/flows.json` (node: `node_format_alert`) |
+| **SIT314 requirement** | Event-driven architecture — alert event generation |
+
+---
+
+### P2-04 — Automated HTTP REST forwarding to Inventory Service
+
+| Field | Value |
+|-------|-------|
+| **Date/Time** | 2026-10-04T15:24:20+11:00 |
+| **Feature tested** | HTTP Request node: `PUT /inventory/:store/:product` |
+| **Command/action** | Automated REST dispatch from Node-RED to Inventory Service API |
+| **Actual result** | 11 successful HTTP PUT requests dispatched to `http://localhost:3001/inventory/STORE-01/:product_id`, live stock updated in MongoDB Atlas `inventory_status`. |
+| **Pass/Fail** | ✅ PASS |
+| **Evidence filename** | `scripts/test_phase2.js` |
+| **SIT314 requirement** | Event-driven microservice integration via edge pipeline |
+
+---
+
+## Phase 2 Summary
+
+| Check | Status |
+|-------|--------|
+| Node-RED isolated runtime configured (`node-red/settings.js`) | ✅ |
+| Declarative flow exported (`node-red/flows.json`) | ✅ |
+| Node-RED connects to MQTT Broker on port 1883 | ✅ |
+| Sensor telemetry validated and noise filtered at the edge | ✅ |
+| Low-stock events detected and converted to event payloads | ✅ |
+| Live stock updates forwarded to Inventory Service REST API | ✅ |
+| Phase 2 automated test suite (`scripts/test_phase2.js`) passed | ✅ |
+
+**Phase 2 Status: COMPLETE ✅**
+
+
 

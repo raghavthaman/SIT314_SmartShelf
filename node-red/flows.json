@@ -1,0 +1,230 @@
+[
+  {
+    "id": "flow_smartshelf_01",
+    "type": "tab",
+    "label": "SmartShelf Sensor Ingestion & Filtering",
+    "disabled": false,
+    "info": "Edge gateway flow that subscribes to MQTT sensor topics, filters invalid sensor noise, tags threshold alerts, and routes telemetry to the inventory service."
+  },
+  {
+    "id": "broker_local",
+    "type": "mqtt-broker",
+    "name": "SmartShelf Mosquitto/Aedes Broker",
+    "broker": "127.0.0.1",
+    "port": "1883",
+    "clientid": "nodered-smartshelf-edge",
+    "autoConnect": true,
+    "usetls": false,
+    "protocolVersion": "4",
+    "keepalive": "60",
+    "cleansession": true,
+    "autoUnsubscribe": true
+  },
+  {
+    "id": "node_mqtt_in",
+    "type": "mqtt in",
+    "z": "flow_smartshelf_01",
+    "name": "MQTT In: smartshelf/sensors/#",
+    "topic": "smartshelf/sensors/#",
+    "qos": "1",
+    "datatype": "auto-detect",
+    "broker": "broker_local",
+    "nl": false,
+    "rap": true,
+    "rh": 0,
+    "inputs": 0,
+    "x": 160,
+    "y": 140,
+    "wires": [
+      [
+        "node_validate_filter"
+      ]
+    ]
+  },
+  {
+    "id": "node_validate_filter",
+    "type": "function",
+    "z": "flow_smartshelf_01",
+    "name": "Validate & Filter Telemetry",
+    "func": "let data = msg.payload;\nif (typeof data === 'string') {\n  try { data = JSON.parse(data); } catch(e) { return [null, { payload: { error: 'invalid_json', raw: data } }]; }\n}\n\n// Mandatory field checks\nif (!data || !data.store_id || !data.product_id || typeof data.quantity !== 'number') {\n  return [null, { payload: { reason: 'missing_fields', data: data } }];\n}\n\n// Out-of-range / noise filtering rule\nif (data.quantity < 0) {\n  return [null, { payload: { reason: 'out_of_range_noise', quantity: data.quantity, product_id: data.product_id, store_id: data.store_id, timestamp: new Date().toISOString() } }];\n}\n\n// Enrich telemetry with edge metadata\ndata.gateway_id = 'NODE-RED-EDGE-01';\ndata.edge_processed_at = new Date().toISOString();\n\n// Low stock threshold checking\nconst thresholds = { 'SKU-1001': 15, 'SKU-1002': 10, 'SKU-1003': 20 };\nconst threshold = thresholds[data.product_id] || 10;\n\ndata.low_stock_warning = data.quantity <= threshold;\ndata.threshold = threshold;\n\nmsg.payload = data;\n// Output 1: Valid Telemetry, Output 2: Dropped Noise\nreturn [msg, null];",
+    "outputs": 2,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 420,
+    "y": 140,
+    "wires": [
+      [
+        "node_route_switch",
+        "node_debug_valid"
+      ],
+      [
+        "node_debug_noise"
+      ]
+    ]
+  },
+  {
+    "id": "node_route_switch",
+    "type": "switch",
+    "z": "flow_smartshelf_01",
+    "name": "Route: Alert vs Standard",
+    "property": "payload.low_stock_warning",
+    "propertyType": "msg",
+    "rules": [
+      {
+        "t": "true"
+      },
+      {
+        "t": "else"
+      }
+    ],
+    "checkall": "true",
+    "repair": false,
+    "outputs": 2,
+    "x": 670,
+    "y": 140,
+    "wires": [
+      [
+        "node_format_alert",
+        "node_format_inventory_http"
+      ],
+      [
+        "node_format_inventory_http"
+      ]
+    ]
+  },
+  {
+    "id": "node_format_inventory_http",
+    "type": "function",
+    "z": "flow_smartshelf_01",
+    "name": "Format Inventory HTTP PUT",
+    "func": "const p = msg.payload;\nmsg.url = 'http://localhost:3001/inventory/' + p.store_id + '/' + p.product_id;\nmsg.method = 'PUT';\nmsg.headers = { 'content-type': 'application/json' };\nmsg.payload = {\n  on_hand_qty: p.quantity,\n  last_sensor: p.sensor_type,\n  source: 'node-red-gateway'\n};\nreturn msg;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 930,
+    "y": 160,
+    "wires": [
+      [
+        "node_http_request"
+      ]
+    ]
+  },
+  {
+    "id": "node_http_request",
+    "type": "http request",
+    "z": "flow_smartshelf_01",
+    "name": "PUT /inventory/:store/:product",
+    "method": "use",
+    "ret": "obj",
+    "paytoqs": "ignore",
+    "url": "",
+    "tls": "",
+    "persist": false,
+    "proxy": "",
+    "insecureHTTPParser": false,
+    "authType": "",
+    "senderr": false,
+    "headers": [],
+    "x": 1210,
+    "y": 160,
+    "wires": [
+      [
+        "node_debug_http_resp"
+      ]
+    ]
+  },
+  {
+    "id": "node_format_alert",
+    "type": "function",
+    "z": "flow_smartshelf_01",
+    "name": "Format Low-Stock Alert Event",
+    "func": "const p = msg.payload;\nmsg.payload = {\n  event_type: 'LOW_STOCK_ALERT',\n  store_id: p.store_id,\n  shelf_id: p.shelf_id,\n  product_id: p.product_id,\n  current_quantity: p.quantity,\n  threshold: p.threshold,\n  timestamp: new Date().toISOString(),\n  action: 'TRIGGER_EOQ_REORDER'\n};\nreturn msg;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 940,
+    "y": 90,
+    "wires": [
+      [
+        "node_debug_low_stock"
+      ]
+    ]
+  },
+  {
+    "id": "node_debug_valid",
+    "type": "debug",
+    "z": "flow_smartshelf_01",
+    "name": "[Valid Telemetry]",
+    "active": true,
+    "tosidebar": true,
+    "console": true,
+    "tostatus": false,
+    "complete": "payload",
+    "targetType": "msg",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 680,
+    "y": 220,
+    "wires": []
+  },
+  {
+    "id": "node_debug_noise",
+    "type": "debug",
+    "z": "flow_smartshelf_01",
+    "name": "[Dropped Noise]",
+    "active": true,
+    "tosidebar": true,
+    "console": true,
+    "tostatus": false,
+    "complete": "payload",
+    "targetType": "msg",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 680,
+    "y": 280,
+    "wires": []
+  },
+  {
+    "id": "node_debug_low_stock",
+    "type": "debug",
+    "z": "flow_smartshelf_01",
+    "name": "[Low Stock Event]",
+    "active": true,
+    "tosidebar": true,
+    "console": true,
+    "tostatus": false,
+    "complete": "payload",
+    "targetType": "msg",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 1210,
+    "y": 90,
+    "wires": []
+  },
+  {
+    "id": "node_debug_http_resp",
+    "type": "debug",
+    "z": "flow_smartshelf_01",
+    "name": "[HTTP Response]",
+    "active": true,
+    "tosidebar": true,
+    "console": true,
+    "tostatus": false,
+    "complete": "payload",
+    "targetType": "msg",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 1440,
+    "y": 160,
+    "wires": []
+  }
+]

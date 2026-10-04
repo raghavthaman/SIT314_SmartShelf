@@ -5,6 +5,9 @@
   "private": true,
   "scripts": {
     "seed": "node scripts/seed.js",
+    "start:broker": "node services/mqtt-broker/server.js",
+    "start:nodered": "node-red -u node-red -s node-red/settings.js node-red/flows.json",
+    "simulate": "node simulator/sensor_publisher.js",
     "start:inventory": "cd services/inventory-service && npm start",
     "start:forecast": "cd services/forecast-service && npm start",
     "start:notification": "cd services/notification-service && npm start",

@@ -24,10 +24,13 @@ mqtt/certs/*.srl
 mqtt/passwd
 mqtt/password_file
 
-# Node-RED credentials (contains encrypted secrets)
+# Node-RED credentials and local runtime state
 flows_cred.json
+flows_*_cred.json
+.config.*
 .config.nodes.json
 .config.users.json
+.config.runtime.json
 
 # AWS credentials and config
 .aws/
