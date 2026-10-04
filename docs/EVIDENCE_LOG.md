@@ -516,7 +516,121 @@ Seed complete.
 
 **Phase 4 Status: COMPLETE ✅**
 
+---
 
+## Phase 5 — Order Service (EOQ-Sized Replenishment) & Notification Service
 
+### P5-01 — Order sizing & lifecycle rules
 
+| Field | Value |
+|-------|-------|
+| **Date/Time** | 2026-10-04T16:03:45+11:00 |
+| **Feature tested** | `services/order-service/order_engine.js` — fallback sizing, threshold top-up, lifecycle state machine |
+| **Command/action** | `node scripts/test_phase5.js` (Step 1) |
+| **Actual result** | `fallbackOrderQty(6, 15, 12) = 24`, `ensureAboveThreshold(12, 2, 20, 12) = 24`, `ensureAboveThreshold(84, 6, 15, 12) = 84`; PENDING→CONFIRMED and DISPATCHED→DELIVERED allowed, DELIVERED→PENDING and PENDING→DELIVERED rejected. |
+| **Pass/Fail** | ✅ PASS |
+| **Evidence filename** | `results/raw/phase5-test.log` (local, gitignored) |
+| **SIT314 requirement** | Business rules for automated replenishment |
 
+---
+
+### P5-02 — Order & Notification services start; health checks pass
+
+| Field | Value |
+|-------|-------|
+| **Date/Time** | 2026-10-04T16:03:46+11:00 |
+| **Feature tested** | Order Service (port 3004) and Notification Service (port 3003) startup with Atlas ping |
+| **Command/action** | Spawned `services/order-service/server.js` and `services/notification-service/server.js`; `GET /health` on both |
+| **Actual result** | `Order Service listening`, `Notification Service listening`; both `/health` returned HTTP 200 `healthy`. |
+| **Pass/Fail** | ✅ PASS |
+| **Evidence filename** | `services/order-service/server.js`, `services/notification-service/server.js` |
+| **SIT314 requirement** | Independent microservices with ALB-compatible health checks |
+
+---
+
+### P5-03 — Idempotent order creation from duplicate replenishment events
+
+| Field | Value |
+|-------|-------|
+| **Date/Time** | 2026-10-04T16:03:49+11:00 |
+| **Feature tested** | Stock event consumer (`event_consumer.js`) + unique partial index `one_open_order_per_product` |
+| **Command/action** | 6 `REPLENISHMENT_REQUIRED` events left in `smartshelf-stock-events-queue` by Phase 3 + 3 injected by the test (9 total, all STORE-01/SKU-1002) |
+| **Actual result** | Queue drained to depth 0. 9 events → **1** order `PO-1791090229135-7f7d0a`; `duplicate_events = 8` recorded on that order. Exactly 1 open order for SKU-1002. |
+| **Pass/Fail** | ✅ PASS |
+| **Evidence filename** | `results/raw/phase5-test.log` |
+| **SIT314 requirement** | Event-driven decoupling; idempotency under at-least-once delivery / competing consumers |
+
+---
+
+### P5-04 — Order quantity sized by Forecast Service EOQ
+
+| Field | Value |
+|-------|-------|
+| **Date/Time** | 2026-10-04T16:03:49+11:00 |
+| **Feature tested** | Order Service → Forecast Service `GET /eoq/STORE-01/SKU-1002` |
+| **Command/action** | Automatic, during event consumption |
+| **Actual result** | Order quantity 84 units = 7 cases of 12, `quantity_source: "forecast-eoq"` (matches Phase 4 Q* = 84 for SKU-1002). |
+| **Pass/Fail** | ✅ PASS |
+| **Evidence filename** | `services/order-service/event_consumer.js` |
+| **SIT314 requirement** | Inter-service collaboration; EOQ-driven ordering |
+
+---
+
+### P5-05 — Order lifecycle and delivery replenishes stock
+
+| Field | Value |
+|-------|-------|
+| **Date/Time** | 2026-10-04T16:03:50+11:00 |
+| **Feature tested** | `PATCH /orders/:order_id/status` |
+| **Command/action** | PENDING → CONFIRMED → DISPATCHED → DELIVERED, then DELIVERED → PENDING |
+| **Actual result** | Three transitions HTTP 200. `inventory_status` SKU-1002 `on_hand_qty` **6 → 90 (+84)** on delivery. Invalid DELIVERED → PENDING rejected with HTTP 409. |
+| **Pass/Fail** | ✅ PASS |
+| **Evidence filename** | `results/raw/phase5-test.log` |
+| **SIT314 requirement** | Closed-loop stock management (sense → decide → order → deliver) |
+
+---
+
+### P5-06 — Graceful degradation when Forecast Service is down
+
+| Field | Value |
+|-------|-------|
+| **Date/Time** | 2026-10-04T16:03:52+11:00 |
+| **Feature tested** | Fallback order sizing; manual `POST /orders`; duplicate protection |
+| **Command/action** | Stopped Forecast Service, `POST /orders {"store_id":"STORE-01","product_id":"SKU-1003"}` twice, then cancelled |
+| **Actual result** | First request HTTP 201 `PO-1791090232609-e183ca` qty 8 (1 case), `quantity_source: "fallback"`. Second request HTTP 409 (open order exists). Cancel → HTTP 200. |
+| **Pass/Fail** | ✅ PASS |
+| **Evidence filename** | `results/raw/phase5-test.log` |
+| **SIT314 requirement** | Fault tolerance / availability under dependency failure |
+
+---
+
+### P5-07 — Notifications dispatched and recorded
+
+| Field | Value |
+|-------|-------|
+| **Date/Time** | 2026-10-04T16:03:54+11:00 |
+| **Feature tested** | Notification consumer on `smartshelf-notifications-queue`, `GET /notifications`, `GET /notifications/stats` |
+| **Command/action** | Automatic consumption of `ORDER_CREATED` / `ORDER_STATUS_CHANGED` events |
+| **Actual result** | For PO-1791090229135-7f7d0a: `[warning] Replenishment order raised`, `[info] CONFIRMED`, `[info] DISPATCHED`, `[info] DELIVERED`. Stats `{"ORDER_STATUS_CHANGED":4,"ORDER_CREATED":2}`, queue depth 0. Redelivered messages de-duplicated by `message_id` (unique index). |
+| **Pass/Fail** | ✅ PASS |
+| **Evidence filename** | `services/notification-service/server.js` |
+| **SIT314 requirement** | Asynchronous alert dispatch; auditable notification history |
+
+---
+
+## Phase 5 Summary
+
+| Check | Status |
+|-------|--------|
+| Order Service operational on port 3004 | ✅ |
+| Notification Service operational on port 3003 | ✅ |
+| Replenishment events consumed from `smartshelf-stock-events-queue` | ✅ |
+| Duplicate events collapsed to one open order (DB-enforced, replica-safe) | ✅ |
+| Order quantity from Forecast Service EOQ, rounded to case packs | ✅ |
+| Fallback sizing when Forecast Service unavailable | ✅ |
+| Order lifecycle state machine with 409 on invalid transitions | ✅ |
+| Delivery increments `inventory_status.on_hand_qty` | ✅ |
+| Order events published to `smartshelf-notifications-queue` and recorded | ✅ |
+| Phase 5 automated test suite (`scripts/test_phase5.js`) passed (10/10) | ✅ |
+
+**Phase 5 Status: COMPLETE ✅**

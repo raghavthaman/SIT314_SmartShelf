@@ -25,6 +25,10 @@ function loadConfig() {
     awsRegion: process.env.AWS_REGION || "us-east-1",
     sqsReadingsQueueUrl: process.env.SQS_READINGS_QUEUE_URL,
     sqsStockEventsQueueUrl: process.env.SQS_STOCK_EVENTS_QUEUE_URL,
+    sqsNotificationsQueueUrl: process.env.SQS_NOTIFICATIONS_QUEUE_URL,
+
+    // Inter-service URLs
+    forecastServiceUrl: process.env.FORECAST_SERVICE_URL || "http://localhost:3002",
 
     // Forecast
     forecastWindowPeriods: parseInt(process.env.FORECAST_WINDOW_PERIODS, 10) || 7,

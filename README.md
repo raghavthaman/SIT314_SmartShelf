@@ -28,9 +28,9 @@ Built on top of the working 4.2D implementation, extended for SIT314 6.3D with:
 ├── services/
 │   ├── shared/             # Shared db.js, logger.js, config.js
 │   ├── inventory-service/  # Phase 0: working REST API
-│   ├── forecast-service/   # Phase X: EOQ/Wilson forecast (stub)
-│   ├── notification-service/ # Phase X: alert dispatcher (stub)
-│   └── order-service/      # Phase X: order placement (stub)
+│   ├── forecast-service/   # Phase 4: EOQ/Wilson forecast (port 3002)
+│   ├── notification-service/ # Phase 5: order alert dispatcher (port 3003)
+│   └── order-service/      # Phase 5: EOQ-sized replenishment orders (port 3004)
 ├── simulator/              # MQTT sensor simulator (Phase 1+)
 ├── .env.example            # Copy to .env — fill in secrets
 ├── .gitignore
@@ -68,6 +68,31 @@ cd ../.. && node scripts/seed.js
 | GET | /inventory/:store | Stock for a store |
 | GET | /inventory/:store/:product | Stock for product |
 | PUT | /inventory/:store/:product | Update stock estimate |
+
+## Order Service (port 3004)
+
+Consumes `REPLENISHMENT_REQUIRED` events from `smartshelf-stock-events-queue`, sizes each order with the
+Forecast Service EOQ (falls back to local sizing if it is down), and allows at most one open order per
+store/product (unique partial index). Order events go to `smartshelf-notifications-queue`.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | /health | Health check (DB ping) |
+| GET | /orders | List orders (`?store_id=&product_id=&status=`) |
+| GET | /orders/:order_id | Get order |
+| POST | /orders | Manual replenishment order `{store_id, product_id}` (409 if one is open) |
+| PATCH | /orders/:order_id/status | `{status}` — PENDING → CONFIRMED → DISPATCHED → DELIVERED, or CANCELLED. DELIVERED adds the quantity to stock |
+
+## Notification Service (port 3003)
+
+Consumes `smartshelf-notifications-queue`, dispatches alerts to the console log (and to
+`NOTIFICATION_WEBHOOK_URL` if set), and records them in the `notifications` collection.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | /health | Health check (DB ping) |
+| GET | /notifications | History (`?store_id=&product_id=&event_type=`) |
+| GET | /notifications/stats | Counts by event type + queue depth |
 
 ## Evidence
 
