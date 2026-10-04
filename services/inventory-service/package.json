@@ -1,0 +1,15 @@
+{
+  "name": "smartshelf-inventory-service",
+  "version": "1.0.0",
+  "description": "SmartShelf Inventory Service — REST API + SQS consumer for sensor-fused stock tracking",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test test/"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "mongodb": "^6.8.0"
+  }
+}

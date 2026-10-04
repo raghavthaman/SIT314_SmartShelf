@@ -1,0 +1,60 @@
+# Environment / secrets — NEVER commit real credentials
+.env
+.env.*
+!.env.example
+
+# Node dependencies
+node_modules/
+npm-debug.log*
+
+# TLS / certificates / private keys
+*.pem
+*.key
+*.crt
+*.srl
+certs/private/
+mqtt/certs/*.pem
+mqtt/certs/*.key
+mqtt/certs/*.crt
+mqtt/certs/*.srl
+!mqtt/certs/README.md
+
+# Mosquitto password file
+mqtt/passwd
+mqtt/password_file
+
+# Node-RED credentials (contains encrypted secrets)
+flows_cred.json
+.config.nodes.json
+.config.users.json
+
+# AWS credentials and config
+.aws/
+aws_credentials
+credentials.json
+*_credentials.json
+
+# Private keys (any format)
+*_private.json
+*_rsa
+*_dsa
+*_ecdsa
+*_ed25519
+*.p12
+*.pfx
+
+# Load test large raw output (keep .gitkeep, ignore large files)
+results/raw/*.log
+results/raw/*.csv
+!results/.gitkeep
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
